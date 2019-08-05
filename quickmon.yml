@@ -1,0 +1,76 @@
+variables:
+theme: dark # light
+
+textboxes:
+  - title: System
+    position: [[0, 0], [26, 17]]
+    rate-ms: 3000
+    pty: true
+    init: $VSQL -XAqt
+    sample: |
+      \o /tmp/quickmon.out.tmp
+      \i quickmon.sql
+      \o
+      \! cp -f /tmp/quickmon.out.tmp /tmp/quickmon.out
+      select sysdate();
+    transform: |
+      (
+        echo $'system time \t' "$(grep 'NOW|' /tmp/quickmon.out | cut -d '|' -f 2)"
+        echo $'node count \t' "$(grep 'SYSTEM|' /tmp/quickmon.out | cut -d '|' -f 2)"
+        echo $'down node count \t' "$(grep 'SYSTEM|' /tmp/quickmon.out | cut -d '|' -f 3)"
+        echo $'epoch lag \t' "$(grep 'SYSTEM|' /tmp/quickmon.out | cut -d '|' -f 4)"
+        echo $'wos row count \t' "$(grep 'SYSTEM|' /tmp/quickmon.out | cut -d '|' -f 5)"
+        echo $'total used MB \t' "$(grep 'SYSTEM|' /tmp/quickmon.out | cut -d '|' -f 6)"
+        echo $'current epoch \t' "$(grep 'SYSTEM|' /tmp/quickmon.out | cut -d '|' -f 7)"
+        echo $'last good epoch \t' "$(grep 'SYSTEM|' /tmp/quickmon.out | cut -d '|' -f 8)"
+        echo $'ahm epoch \t' "$(grep 'SYSTEM|' /tmp/quickmon.out | cut -d '|' -f 9)"
+        echo $'memory_for_db_kb \t' "$(grep 'MEMORY_SIZE|' /tmp/quickmon.out | cut -d '|' -f 2)"
+      ) | column -t -s $'\t'
+
+  - title: Resource pool status
+    position: [[0, 17], [26, 15]]
+    rate-ms: 3000
+    sample: |
+      (
+        echo 'name|running|free|queued'
+        grep 'RESOURCE_POOL_STATUS|' /tmp/quickmon.out | sed 's/^[^|]*|//g'
+      ) | column -t -s '|'
+
+  - title: Tuple mover operations
+    position: [[0, 31], [26, 9]]
+    rate-ms: 3000
+    sample: |
+      (
+        echo 'table_name|operation_name'
+        grep 'TUPLE_MOVER_OPERATIONS|' /tmp/quickmon.out | sed 's/^[^|]*\|//g'
+      ) | column -t -s '|'
+
+runcharts:
+  - title: Resouce Usage
+    rate-ms: 3000
+    scale: 0
+    legend:
+      enabled: true
+      details: false
+    items:
+      - label: CPU 
+        sample: grep 'CPU_USAGE|' /tmp/quickmon.out | cut -d '|' -f 3
+      - label: Memory 
+        sample: grep 'MEMORY_SIZE|' /tmp/quickmon.out | cut -d '|' -f 4
+
+  - title: Workload
+    rate-ms: 3000
+    scale: 0
+    legend:
+      enabled: true
+      details: false
+    items:
+      - label: Sessions
+        sample: grep 'SESSION_COUNT|' /tmp/quickmon.out | cut -d '|' -f 2
+      - label: Running queries
+        sample: grep 'RUNNING_QUERY_COUNT|' /tmp/quickmon.out | cut -d '|' -f 2
+      - label: Queued queries
+        sample: grep 'QUEUED_QUERY_COUNT|' /tmp/quickmon.out | cut -d '|' -f 2
+      - label: Free query entries
+        sample: grep 'FREE_QUERY_ENTRY_COUNT|' /tmp/quickmon.out | cut -d '|' -f 2
+
